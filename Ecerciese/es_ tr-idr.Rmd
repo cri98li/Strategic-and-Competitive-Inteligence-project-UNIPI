@@ -1,0 +1,145 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+install.packages("udpipe")
+```
+
+```{r}
+library(udpipe)
+library(tidyverse)
+library(tidytext)
+library(SnowballC)
+```
+
+```{r}
+patents <- read_csv('data_prepared_python.csv')
+```
+
+```{r}
+patents <- patents %>% sample_n(1000, seed=42) 
+patents %>% head()
+```
+
+```{r}
+ipc_descriptions <- read_csv('CPC_descriptions.csv')
+ipc_descriptions %>% head()
+```
+
+```{r}
+ud_model <- udpipe_download_model(language = "english")
+ud_model <- udpipe_load_model(ud_model$file_model)
+```
+
+```{r}
+patents <- patents %>%
+  unite(col="title_abstract", title, abstract, sep=". ")
+```
+
+Una parola è importante se è caratterizzante per una ipc class
+
+```{r}
+paroleImportanti = c('motorsport', 'racing', 'automotive', 'security', 'race', 'system', 'speed', 'moto', 'image', 'electrification', 'fuel', 'autonomous', 'esport', 'wheel', 'car', 'cars', 'drive', 'driving', 'roborace', 'vehicles', 'motor')
+```
+
+```{r}
+
+patents <- patents %>% mutate(code_1 = tolower(substr(ipc_classes, 0, 1)))
+```
+
+```{r}
+tokens = patents %>%
+          inner_join(ipc_descriptions 
+                     %>% select(code_1, descr_1) %>% 
+                distinct(),
+                by="code_1") %>%
+          select(code_1, descr_1, title_abstract) %>%
+          unnest_tokens(word, title_abstract) %>%
+          mutate(word = wordStem(word)) %>%
+          count(code_1, descr_1, word, sort = TRUE)
+
+head(tokens)
+```
+
+```{r}
+tf_idf <- tokens %>%
+  bind_tf_idf(word, code_1, n)
+```
+
+```{r}
+
+for (code in unique(tokens$descr_1)){
+  print(tf_idf %>%
+ filter(descr_1 == code) %>%
+ top_n(20, tf_idf) %>%
+ ggplot(aes(x = reorder(word, tf_idf), y = tf_idf)) +
+ geom_bar(stat = "identity") +
+ coord_flip() +
+ ggtitle(code) +
+ xlab("") +
+ theme_bw())
+}
+```
+
+```{r}
+patents_tagged <- udpipe_annotate(ud_model, x = patents$title_abstract, doc_id = patents$filename) %>%
+ as_tibble()
+```
+
+```{r}
+patents_tagged
+```
+
+```{r}
+lemmas <- patents_tagged %>%
+  filter(upos != 'PUNCT') %>%
+  select(doc_id, lemma) %>%
+  dplyr::count(lemma, sort = TRUE) %>%
+  ungroup()
+```
+
+```{r}
+data("stop_words")
+lemmas_clean <- lemmas %>%
+  rename(word = lemma) %>%
+  anti_join(stop_words)
+```
+
+```{r}
+lemmas_clean %>% slice_max(n, n = 10) %>% 
+                 ggplot(mapping = aes(x=word, y=n)) +
+                 geom_bar(stat="identity") +
+                 coord_flip()
+```
+
+```{r}
+
+library(wordcloud)
+
+pal <- brewer.pal(8,"Dark2")
+
+lemmas_clean %>%
+  with(wordcloud(word, n, random.order = FALSE, max.words = 50, colors=pal))
+
+```
+
+```{r}
+pat_stats <- keywords_rake(x = patents_tagged, term = "lemma", group = "doc_id",
+ relevant = patents_tagged$upos %in% c("NOUN", "ADJ")) %>%
+ as_tibble()
+
+head(pat_stats)
+```
+
+```{r}
+pat_stats %>%
+ top_n(20, rake) %>%
+ ggplot(aes(x = reorder(keyword, rake), y = rake)) +
+ geom_bar(stat = "identity") +
+ coord_flip() +
+ xlab("") +
+ theme_bw()
+
+```

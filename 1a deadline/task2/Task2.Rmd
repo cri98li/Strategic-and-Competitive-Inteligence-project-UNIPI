@@ -1,16 +1,21 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
 IDENTIFY MACRO-AREAS OR MARKET FIELDS within the database to acquire some general awareness on its content
 
 ```{r}
 library(tidyverse)
 
-data <- read_csv("../data/data_prepared_python.csv")
+data <- read_csv("../../data/data_subset1.csv")
 
 names(data)
 ```
 
 ```{r}
 library(skimr)
-skim(data)
+#skim(data)
 ```
 
 ## Wordcloud
@@ -27,7 +32,7 @@ library(DT) # for dynamic tables
 library(tidyr)
 
 tidy_dat <- tidyr::gather(data %>%
-                            unite(col="united", abstract, claims, title, sep=" ") %>%
+                            unite(col="united", abstract, title, sep=" ") %>%
                             select(united), key, word) %>% select(word)
 
 tidy_dat
@@ -35,8 +40,12 @@ tidy_dat
 ```
 
 ```{r}
+library(SnowballC)
+
+#uso lo stemming perchè il lemming (udpipe_annotate) sarebbe troppo lento ad eseguire
 tokens <- tidy_dat %>% 
   unnest_tokens(word, word) %>% 
+  mutate(word = wordStem(word)) %>% 
   dplyr::count(word, sort = TRUE) %>% 
   ungroup()
 
@@ -112,8 +121,9 @@ data %>%
 ```{r}
 data_word_count = data %>%
   select(filename, abstract, claims, title) %>%
-  unite(col="united", abstract, claims, title, sep=" ") %>%
+  unite(col="united", abstract, title, sep=" ") %>%
   unnest_tokens(word, united) %>%
+  mutate(word = wordStem(word)) %>% 
   count(filename, word, sort = TRUE) %>%
   anti_join(stop_words)
 
@@ -153,7 +163,8 @@ ap_gg = ap_top_terms %>%
   facet_wrap(~ topic, scales = "free") +
   scale_y_reordered()
 
-girafe(ggobj = ap_gg, width_svg = 9, height_svg = 6, options = list(opts_sizing(rescale = FALSE)))
+
+ap_gg
 
 ```
 
@@ -175,7 +186,7 @@ codice da [Relationships between words: n-grams and correlations \| Text Mining 
 
 ```{r}
 bigrams <- data %>%
-  unite(col="united", abstract, claims, title, sep=" ") %>%
+  unite(col="united", title, sep=" ") %>%
   unnest_tokens(bigram, united, token = "ngrams", n = 2) %>%
   select(bigram) #%>%
   #count(bigram, sort=TRUE)
@@ -195,6 +206,8 @@ bigrams_filtered <- bigrams_separated %>%
 
 # new bigram counts:
 bigram_counts <- bigrams_filtered %>% 
+  mutate(word1 = wordStem(word1)) %>% 
+  mutate(word2 = wordStem(word2)) %>% 
   count(word1, word2, sort = TRUE)
 
 bigram_counts
@@ -205,7 +218,7 @@ library(igraph)
 library(ggraph)
 
 bigram_graph <- bigram_counts %>%
-  filter(n >= 40) %>%
+  filter(n >= 500) %>%
   graph_from_data_frame()
 
 set.seed(2017)
@@ -224,8 +237,7 @@ gg
 library(igraph)
 library(ggiraph)
 
-girafe(ggobj = gg, width_svg = 12, height_svg = 9,
-       options = list(opts_sizing(rescale = FALSE)))
+gg
 ```
 
 ### Using CPC
@@ -235,7 +247,7 @@ codice sunburst da: [Create Basic Sunburst Graphs with ggplot2 \| by Yahia El Ga
 ```{r}
 library(tidyverse)
 
-cpc_descr <- read_csv("../data/CPC_descriptions.csv")
+cpc_descr <- read_csv("../../data/CPC_descriptions.csv")
 
 cpc_descr %>% head(5)
 ```
@@ -269,146 +281,26 @@ res
 ```
 
 ```{r}
+library(sunburstR)
+res$descr_1<-gsub("-","_",as.character(res$descr_1))
+res$descr_3<-gsub("-","_",as.character(res$descr_3))
+res$descr_4<-gsub("-","_",as.character(res$descr_4))
 
-compute_angle = function(perc){
-  angle = -1
-  if(perc < 0.25) # 1st q [90,0]
-    angle = 90 - (perc/0.25) * 90
-  else if(perc < 0.5) # 2nd q [0, -90]
-    angle = (perc-0.25) / 0.25 * -90
-  else if(perc < 0.75) # 3rd q [90, 0]
-   angle = 90 - ((perc-0.5) / 0.25 * 90)
-  else if(perc < 1.00) # last q [0, -90]
-    angle = ((perc -0.75)/0.25) * -90
-# Or even more compact, but less readable
-  if(perc < 0.5) # 1st half [90, -90]
-    angle = (180 - (perc/0.5) * 180) - 90
-  else # 2nd half [90, -90]
-    angle = (90 - ((perc - 0.5)/0.5) * 180)
-  return(angle)
-}
+dat <- res %>% 
+  unite(col="united", descr_1, descr_3, descr_4, sep="-") %>%
+  group_by(united) %>%
+  count(sort= TRUE)
 
-
-firstLevel = res %>% summarize(total_pop=sum(n))
-
-tot = nrow(res)
-
-desc_1_pop = res %>% group_by(descr_1) %>%
-  summarize(total_pop=sum(n)) %>%
-  arrange(desc(total_pop)) %>%
-  mutate(running=cumsum(total_pop), pos=running - total_pop/2) %>%
-  group_by(1:n()) %>%
-  mutate(angle=compute_angle((running - total_pop/2) / tot)) %>%
-  mutate(descr_1 = substr(descr_1, 0, 30))
-
-desc_3_pop = res %>% group_by(descr_3) %>%
-  summarize(total_pop=sum(n)) %>%
-  arrange(desc(total_pop)) %>%
-  mutate(running=cumsum(total_pop), pos=running - total_pop/2) %>%
-  group_by(1:n()) %>%
-  mutate(angle=compute_angle((running - total_pop/2) / tot))%>%
-  mutate(descr_3 = substr(descr_3, 0, 30))
-
-desc_4_pop = res %>% group_by(descr_4) %>%
-  summarize(total_pop=sum(n)) %>%
-  arrange(desc(total_pop)) %>%
-  mutate(running=cumsum(total_pop), pos=running - total_pop/2) %>%
-  group_by(1:n()) %>%
-  mutate(angle=compute_angle((running - total_pop/2) / tot))%>%
-  mutate(descr_4 = substr(descr_4, 0, 30))
-
+dat %>% head()
 ```
 
 ```{r}
-library(scales)
-
-base = 
-  ggplot(firstLevel) + 
-  geom_bar(data=firstLevel, aes(x=1, y=tot), fill='darkgrey', stat='identity') +
-  geom_text(aes(x=2, y=tot/2, label=paste(total_pop, " patents")), color='white')
-
-
-sunburst_1 = base+
-  geom_bar(data=desc_1_pop,
-    aes(x=2, y=total_pop, fill=total_pop, stroke=3),
-    color='white', position='stack', stat='identity')+
-  geom_text(data=desc_1_pop,
-   aes(label=paste(descr_1, total_pop), x=2, y=pos, angle=angle))
-
-
-sunburst_3 = base +
-  geom_bar(data=desc_3_pop,
-    aes(x=2, y=total_pop, fill=total_pop, stroke=3),
-    color='white', position='stack', stat='identity')+
-  geom_text(data=desc_3_pop,
-   aes(label=paste(descr_3, total_pop), x=2, y=pos, angle=angle))
-
-
-sunburst_4 = base +
-  geom_bar(data=desc_4_pop,
-    aes(x=2, y=total_pop, fill=total_pop, stroke=3),
-    color='white', position='stack', stat='identity')+
-  geom_text(data=desc_4_pop,
-   aes(label=paste(descr_4, total_pop), x=2, y=pos, angle=angle))
+library(d3r)
   
 
+sb3 <- sund2b(dat,
+              breadcrumbs = sund2bBreadcrumb(enabled = TRUE), 
+              showLabels=TRUE)
 
-```
-
-```{r}
-girafe(ggobj = sunburst_1 + coord_polar('y'), width_svg = 13, height_svg = 13,
-       options = list(opts_sizing(rescale = FALSE)))
-```
-
-```{r}
-girafe(ggobj = sunburst_3 + coord_polar('y'), width_svg = 13, height_svg = 13,
-       options = list(opts_sizing(rescale = FALSE)))
-```
-
-```{r}
-girafe(ggobj = sunburst_4 + coord_polar('y'), width_svg = 13, height_svg = 13,
-       options = list(opts_sizing(rescale = FALSE)))
-```
-
-```{r}
-
-desc_1_pop = res %>% group_by(descr_1) %>%
-  summarize(total_pop=sum(n)) %>%
-  arrange(desc(total_pop)) %>%
-  mutate(running=cumsum(total_pop), pos=running - total_pop/2) %>%
-  group_by(1:n()) %>%
-  mutate(angle=compute_angle((running - total_pop/2) / tot)) %>%
-  mutate(descr_1 = substr(descr_1, 0, 20))
-
-desc_3_pop = res %>% group_by(descr_3) %>%
-  summarize(total_pop=sum(n)) %>%
-  
-  mutate(running=cumsum(total_pop), pos=running - total_pop/2) %>%
-  group_by(1:n()) %>%
-  mutate(angle=compute_angle((running - total_pop/2) / tot))%>%
-  mutate(descr_3 = substr(descr_3, 0, 20))
-
-base = 
-  ggplot(firstLevel) + 
-  geom_bar(data=firstLevel, aes(x=1, y=tot), fill='darkgrey', stat='identity') +
-  geom_text(aes(x=2, y=tot/2, label=paste(total_pop, " patents")), color='white')
-
-
-sunburst_1 = base+
-  geom_bar(data=desc_1_pop,
-    aes(x=2, y=total_pop, fill=total_pop, stroke=3),
-    color='white', position='stack', stat='identity')+
-  geom_text(data=desc_1_pop,
-   aes(label=paste(descr_1, total_pop), x=2, y=pos, angle=angle))
-
-
-sunburst_3 = sunburst_1 +
-  geom_bar(data=desc_3_pop,
-    aes(x=3, y=total_pop, fill=total_pop, stroke=3),
-    color='white', position='stack', stat='identity')+
-  geom_text(data=desc_3_pop,
-   aes(label=paste(descr_3, total_pop), x=3, y=pos, angle=angle))
-
-girafe(ggobj = sunburst_3 + coord_polar('y'), width_svg = 13, height_svg = 13,
-       options = list(opts_sizing(rescale = FALSE)))
+sb3
 ```

@@ -1,0 +1,26 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+**Step 5 (select patents related to your project work from the MAIN database)**
+
+Start to select patents related to your project work to create the database that you are going to use to make the analysis in the future steps: put these patents together but, please, [register each search strategy and keyword that you are using]{.underline}. Then on April 22 (I will be in Pisa) we will verify together how you are working for this step, patents that you are selecting and their relevance, in order to understand if you are missing some relevant keyword or if you are making some mistakes, before to proceed with the analysis.
+
+```{r}
+library(tidyverse)
+
+data <- read_csv("../data/data_subset1.csv")
+
+data %>% head(20)
+```
+
+```{r}
+data %>%
+  filter(str_detect(tolower(claims), "cosmetics")) %>%
+  select(claims)
+```
+
+```{r}
+
+```
