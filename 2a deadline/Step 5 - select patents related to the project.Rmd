@@ -17,8 +17,8 @@ data %>% head(20)
 
 ```{r}
 data %>%
-  filter(str_detect(tolower(claims), "cosmetics")) %>%
-  select(claims)
+  filter(str_detect(tolower(title), "nanotech.*") | str_detect(tolower(title), "nail")) %>%
+  select(title)
 ```
 
 ```{r}

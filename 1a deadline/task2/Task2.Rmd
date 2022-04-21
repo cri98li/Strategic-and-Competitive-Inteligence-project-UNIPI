@@ -5,7 +5,7 @@ output: html_notebook
 
 IDENTIFY MACRO-AREAS OR MARKET FIELDS within the database to acquire some general awareness on its content
 
-```{r}
+``` {r}x}
 library(tidyverse)
 
 data <- read_csv("../../data/data_subset1.csv")
@@ -66,7 +66,7 @@ tokens_clean %>% head(100)
 pal <- brewer.pal(8,"Dark2")
 
 tokens_clean %>% 
-  with(wordcloud(word, n, random.order = FALSE, max.words = 50, colors=pal))
+  with(wordcloud(word, n, random.order = FALSE, max.words = 100, colors=pal))
 ```
 
 ```{r}
@@ -138,7 +138,7 @@ data_dtm
 ```
 
 ```{r}
-data_lda <- LDA(data_dtm, k = 16, control = list(seed = 1234))
+data_lda <- LDA(data_dtm, k = 8, control = list(seed = 1234))
 ```
 
 ```{r}
@@ -218,10 +218,10 @@ library(igraph)
 library(ggraph)
 
 bigram_graph <- bigram_counts %>%
-  filter(n >= 500) %>%
+  filter(n >= 600) %>%
   graph_from_data_frame()
 
-set.seed(2017)
+set.seed(42)
 
 gg <- ggraph(bigram_graph, layout = "fr") + #fr o graphopt
   geom_edge_link() +
