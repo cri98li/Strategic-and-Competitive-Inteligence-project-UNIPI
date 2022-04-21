@@ -16,11 +16,40 @@ data %>% head(20)
 ```
 
 ```{r}
-data %>%
-  filter(str_detect(tolower(title), "nanotech.*") | str_detect(tolower(title), "nail")) %>%
-  select(title)
+tibble_filtrato <- data %>%
+  unite(col="united", claims, abstract, title, sep=" ") %>%
+  filter(str_detect(tolower(united), "cosmetic")
+         | str_detect(tolower(united),"beauty")
+         | str_detect(tolower(united), "body")
+         | str_detect(tolower(united), "skin")
+         | str_detect(tolower(united), "nail")
+         | str_detect(tolower(united), "molecule")
+         | str_detect(tolower(united), "particle")
+         | str_detect(tolower(united), "fingernail")
+         | str_detect(tolower(united), "cleansing")
+         | str_detect(tolower(united), "manicure")
+         | str_detect(tolower(united), "pharmacological")
+         | str_detect(tolower(united), "technolog")
+         | str_detect(tolower(united), "nano")
+         | str_detect(tolower(united), "varnish")
+         | str_detect(tolower(united), "polish")
+         | str_detect(tolower(united), "altering")
+         ) %>%
+  select(-united)
+
+tibble_filtrato <- tibble_filtrato %>% select(filename)
+```
+
+```{r}
+tibble_filtrato %>% head(5)
 ```
 
 ```{r}
 
+inner_join(data, tibble_filtrato, suffix = c(".x", ".y")) %>% 
+  write_csv("../data/subest1_filtrato.csv")
+```
+
+```{r}
+joined
 ```
